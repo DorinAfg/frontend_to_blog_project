@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Container, Typography, Box, List, ListItem, ListItemText, Paper, Divider, IconButton } from '@mui/material';
+import { Container, Box, Typography, Card, CardContent, CardMedia, IconButton, CircularProgress, Alert } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import axios from 'axios';
@@ -44,8 +44,9 @@ const ProfilePage = () => {
   }, [username]);
 
   const formatDate = (dateString) => {
-    const options = { year: 'numeric', month: 'long', day: 'numeric' };
-    return new Date(dateString).toLocaleDateString(undefined, options);
+    return new Date(dateString).toLocaleDateString(undefined, {
+      year: 'numeric', month: 'long', day: 'numeric'
+    });
   };
 
   const handleDeletePost = async (postId) => {
@@ -91,59 +92,67 @@ const ProfilePage = () => {
   };
 
   return (
-    <Container maxWidth="md" sx={{ mt: 5, fontFamily: "'Roboto', sans-serif" }}>
-      <Box sx={{ textAlign: 'center', mb: 4 }}>
-        <Typography variant="h3" gutterBottom sx={{ fontWeight: 700, color: '#2c3e50' }}>
-          {loading ? "Loading..." : `Welcome, ${username || 'User'}!`}
-        </Typography>
-        <Typography variant="h5" gutterBottom sx={{ fontWeight: 500, color: '#555' }}>
-          Your Posts:
-        </Typography>
-      </Box>
-      
-      <Paper elevation={3} sx={{ bgcolor: '#f9f9f9', borderRadius: 3, p: 3 }}>
-        {posts.length > 0 ? (
-          <List>
-            {posts.map((post) => (
-              <div key={post.id}>
-                <ListItem sx={{ borderBottom: '1px solid #ddd', '&:hover': { bgcolor: '#223b63' } }}>
-                  <ListItemText 
-                    primary={
-                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#555' }}>
-                        {post.author}
-                      </Typography>
-                    }
-                    secondary={
-                      <>
-                        <Typography variant="h6" sx={{ fontWeight: 600, color: '#333', marginBottom: '4px' }}>
-                          {post.title}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: '#777', fontStyle: 'italic' }}>
-                          Created on: {formatDate(post.created_at)}
-                        </Typography>
-                      </>
-                    }
+    <Container maxWidth="sm">
+      {loading ? (
+        <Box sx={{ textAlign: "center", mt: 5 }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <Box sx={{ mt: 3 }}>
+          {posts.length > 0 ? (
+            posts.map((post) => (
+              <Card key={post.id} sx={{ mb: 2, boxShadow: 3, borderRadius: 2, maxWidth: 350, mx: 'auto' }}>
+                {post.image && (
+                  <CardMedia
+                    component="img"
+                    height="200" // גובה קטן יותר לתמונה
+                    image={post.image}
+                    alt="Post Image"
+                    sx={{ objectFit: "cover" }}
                   />
-                  <IconButton onClick={() => handleLikePost(post.id)} sx={{ ml: 2 }} color="primary">
-                    <ThumbUpIcon />
-                  </IconButton>
-                  <Typography variant="body2" sx={{ color: '#777', fontWeight: 500, ml: 1 }}>
-                    {post.likes_count}
+                )}
+                <CardContent>
+                  {/* שם היוצר */}
+                  <Typography variant="body2" sx={{ fontWeight: "bold", color: "#555" }}>
+                    {post.author}
                   </Typography>
-                  <IconButton onClick={() => handleDeletePost(post.id)} sx={{ ml: 2 }} color="error">
-                    <DeleteIcon />
-                  </IconButton>
-                </ListItem>
-                <Divider />
-              </div>
-            ))}
-          </List>
-        ) : (
-          <Typography variant="body1" sx={{ textAlign: 'center', fontStyle: 'italic', color: '#777' }}>
-            No posts yet.
-          </Typography>
-        )}
-      </Paper>
+
+                  {/* כותרת הפוסט */}
+                  <Typography variant="h6" sx={{ fontWeight: "bold", color: "#333", mt: 1 }}>
+                    {post.title}
+                  </Typography>
+                  
+                  {/* תוכן הפוסט */}
+                  <Typography variant="body2" sx={{ color: "#777", mt: 1 }}>
+                    {post.content}
+                  </Typography>
+
+                  {/* תאריך יצירת הפוסט */}
+                  <Typography variant="body2" sx={{ color: "#888", fontStyle: "italic", mt: 1 }}>
+                    Created on: {formatDate(post.created_at)}
+                  </Typography>
+
+                  {/* כפתור לייק */}
+                  <Box sx={{ display: "flex", alignItems: "center", mt: 2 }}>
+                    <IconButton onClick={() => handleLikePost(post.id)} color="primary">
+                      <ThumbUpIcon />
+                    </IconButton>
+                    <Typography variant="body2" sx={{ color: "#777", ml: 1 }}>
+                      {post.likes_count || 0}
+                    </Typography>
+                    {/* כפתור מחיקה */}
+                    <IconButton onClick={() => handleDeletePost(post.id)} color="error">
+                      <DeleteIcon />
+                    </IconButton>
+                  </Box>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <Alert severity="info" sx={{ textAlign: 'center' }}>No posts yet</Alert>
+          )}
+        </Box>
+      )}
     </Container>
   );
 };

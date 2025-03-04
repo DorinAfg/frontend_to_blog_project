@@ -1,150 +1,163 @@
-import React, { useEffect, useState } from 'react';
-import { Container, Typography, Box, List, ListItem, ListItemText, Paper, Divider, IconButton } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import { Container, Box, Typography, Card, CardMedia, CardContent, IconButton, CircularProgress, Alert } from "@mui/material";
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
-import axios from 'axios';
+import DeleteIcon from '@mui/icons-material/Delete';
 
-const API_URL = "http://127.0.0.1:8000/api/posts"; // לא שיניתי את ה-URL של הפוסטים
+const API_URL = "http://127.0.0.1:8000/api";
 
 const PostsPage = () => {
-    const [posts, setPosts] = useState([]);
-    const [loading, setLoading] = useState(true);
+  const [posts, setPosts] = useState([]); // שמירת הפוסטים
+  const [loading, setLoading] = useState(true); // מצב טעינה
+  const [error, setError] = useState(""); // מצב שגיאה
 
-    useEffect(() => {
-        const fetchPosts = async () => {
-            try {
-                const response = await axios.get(`${API_URL}/`, {
-                    headers: {
-                        Authorization: `Bearer ${localStorage.getItem('token')}`,
-                    },
-                });
-                console.log(response.data);  // הדפסת התגובה כדי לראות אם ה-content נמצא כאן
-                setPosts(response.data.results || response.data); // התאמה למבנה הנתונים
-            } catch (error) {
-                console.error("Error fetching posts:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
+  useEffect(() => {
+    const fetchPosts = async () => {
+      try {
+        // שליחת בקשה לקבלת הפוסטים
+        const response = await axios.get(`${API_URL}/posts/`);
+        setPosts(response.data.results || response.data); // שמירה של הפוסטים במצב
+        setLoading(false); // עדכון מצב טעינה
+      } catch (err) {
+        // אם יש שגיאה, הצגת השגיאה
+        console.error("Error fetching posts:", err);
+        setError(`Error fetching posts: ${err.response?.data?.detail || err.message}`);
+        setLoading(false); // עדכון מצב טעינה
+      }
+    };
 
-        fetchPosts();
-    }, []);
+    fetchPosts(); // קריאה לפונקציה בתוך ה-useEffect
+  }, []); // קריאה אחת בלבד, כשמרכיבי הקומפוננטה נטענים
 
-    const handleLikePost = async (postId) => {
-        try {
-            const username = localStorage.getItem('username');
-            const token = localStorage.getItem('token'); // קבלת ה-token מ-localStorage
-    
-            if (!token || !username) {
-                console.error("Token or username not found in localStorage");
-                return;
-            }
-    
-            const data = {
-                post: postId,
-                username: username, // שליחת שם המשתמש
-            };
-    
-            const response = await axios.post('http://127.0.0.1:8000/api/likes/create/', data, {
-                headers: {
-                    Authorization: `Bearer ${token}` // שליחה של הטוקן בכותרת
-                }
-            });
-    
-            console.log("Like response:", response);
-    
-            setPosts((prevPosts) =>
-                prevPosts.map((post) =>
-                    post.id === postId ? { ...post, likes_count: post.likes_count + 1 } : post
-                )
-            );
-        } catch (error) {
-            console.error('Error liking post:', error);
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
+
+  const handleDeletePost = async (postId) => {
+    if (window.confirm("Are you sure you want to delete this post?")) {
+      try {
+        const response = await axios.delete(`${API_URL}/posts/${postId}/`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
+        if (response.status === 204) {
+          setPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId));
+          console.log("Post deleted successfully.");
+        } else {
+          console.error("Failed to delete post:", response.data);
         }
-    };
+      } catch (error) {
+        console.error("Error deleting post:", error);
+      }
+    }
+  };
 
-    const handleDeletePost = async (postId) => {
-        if (!window.confirm("Are you sure you want to delete this post?")) return;
-        
-        try {
-            await axios.delete(`${API_URL}/${postId}/`, {
-                headers: {
-                    Authorization: `Bearer ${localStorage.getItem('token')}`,
-                },
-            });
-            
-            setPosts((prevPosts) => prevPosts.filter(post => post.id !== postId));
-        } catch (error) {
-            console.error("Error deleting post:", error);
+  const handleLikePost = async (postId) => {
+    try {
+      await axios.post(
+        "http://127.0.0.1:8000/api/likes/create/",
+        { post_id: postId }, // שולחים את ה-ID בגוף הבקשה
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            "Content-Type": "application/json",
+          },
         }
-    };
+      );
 
-    const formatDate = (dateString) => {
-        const options = { year: 'numeric', month: 'long', day: 'numeric' };
-        return new Date(dateString).toLocaleDateString(undefined, options);
-    };
+      setPosts((prevPosts) =>
+        prevPosts.map((post) =>
+          post.id === postId ? { ...post, likes_count: post.likes_count + 1 } : post
+        )
+      );
+    } catch (error) {
+      console.error("Error liking post:", error);
+    }
+  };
 
-    return (
-        <Container maxWidth="md" sx={{ mt: 5, fontFamily: "'Roboto', sans-serif" }}>
-            <Box sx={{ textAlign: 'center', mb: 4 }}>
-                <Typography variant="h3" gutterBottom sx={{ fontWeight: 700, color: '#2c3e50' }}>
-                    Blog Posts
-                </Typography>
-            </Box>
-            
-            <Paper elevation={3} sx={{ bgcolor: '#f9f9f9', borderRadius: 3, p: 3 }}>
-                {loading ? (
-                    <Typography variant="body1" sx={{ textAlign: 'center', color: '#777' }}>
-                        Loading...
-                    </Typography>
-                ) : posts.length > 0 ? (
-                    <List>
-                        {posts.map((post) => (
-                            <div key={post.id}>
-                                <ListItem sx={{ borderBottom: '1px solid #ddd', '&:hover': { bgcolor: '#f0f0f0' } }}>
-                                    <ListItemText 
-                                        primary={
-                                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#555' }}>
-                                                {post.author}
-                                            </Typography>
-                                        }
-                                        secondary={
-                                            <>
-                                                <Typography variant="h6" sx={{ fontWeight: 600, color: '#333', mb: '4px' }}>
-                                                    {post.title}
-                                                </Typography>
-                                                <Typography variant="body2" sx={{ color: '#777', fontStyle: 'italic' }}>
-                                                    Created on: {formatDate(post.created_at)}
-                                                </Typography>
-                                            </>
-                                        }
-                                    />
-                                    {/* הצגת התוכן של הפוסט */}
-                                    <Typography variant="body1" sx={{ color: '#333', mt: 2 }}>
-                                        {post.content} {/* הצגת ה-content */}
-                                    </Typography>
-                                    <IconButton onClick={() => handleLikePost(post.id)} sx={{ ml: 2 }} color="primary">
-                                        <ThumbUpIcon />
-                                    </IconButton>
-                                    <Typography variant="body2" sx={{ color: '#777', fontWeight: 500, ml: 1 }}>
-                                        {post.likes_count}
-                                    </Typography>
-                                    <IconButton onClick={() => handleDeletePost(post.id)} sx={{ ml: 2 }} color="error">
-                                        <DeleteIcon />
-                                    </IconButton>
-                                </ListItem>
-                                <Divider />
-                            </div>
-                        ))}
-                    </List>
-                ) : (
-                    <Typography variant="body1" sx={{ textAlign: 'center', fontStyle: 'italic', color: '#777' }}>
-                        No posts found.
-                    </Typography>
+  return (
+    <Container maxWidth="sm">
+      {loading ? (
+        <Box sx={{ textAlign: "center", mt: 5 }}>
+          <CircularProgress />
+        </Box>
+      ) : error ? (
+        <Alert severity="error">{error}</Alert>
+      ) : (
+        <Box sx={{ mt: 3 }}>
+          {posts.length > 0 ? (
+            posts.map((post) => (
+              <Card
+                key={post.id}
+                sx={{
+                  mb: 2,
+                  boxShadow: 3,
+                  borderRadius: 2,
+                  maxWidth: 350,
+                  mx: "auto",
+                }}
+              >
+                {post.image && (
+                  <CardMedia
+                    component="img"
+                    height="200" // גובה קטן יותר לתמונה
+                    image={post.image}
+                    alt="Post Image"
+                    sx={{ objectFit: "cover" }}
+                  />
                 )}
-            </Paper>
-        </Container>
-    );
+                <CardContent>
+                  {/* שם היוצר */}
+                  <Typography variant="body2" sx={{ fontWeight: "bold", color: "#555" }}>
+                    {post.author}
+                  </Typography>
+
+                  {/* כותרת הפוסט */}
+                  <Typography variant="h6" sx={{ fontWeight: "bold", color: "#333", mt: 1 }}>
+                    {post.title}
+                  </Typography>
+
+                  {/* תוכן הפוסט */}
+                  <Typography variant="body2" sx={{ color: "#777", mt: 1 }}>
+                    {post.content}
+                  </Typography>
+
+                  {/* תאריך יצירת הפוסט */}
+                  <Typography variant="body2" sx={{ color: "#888", fontStyle: "italic", mt: 1 }}>
+                    Created on: {formatDate(post.created_at)}
+                  </Typography>
+
+                  {/* כפתור לייק ומחיקה */}
+                  <Box sx={{ display: "flex", alignItems: "center", mt: 2 }}>
+                    <IconButton onClick={() => handleLikePost(post.id)} color="primary">
+                      <ThumbUpIcon />
+                    </IconButton>
+                    <Typography variant="body2" sx={{ color: "#777", ml: 1 }}>
+                      {post.likes_count || 0}
+                    </Typography>
+
+                    {/* כפתור פח זבל */}
+                    <IconButton onClick={() => handleDeletePost(post.id)} color="error">
+                      <DeleteIcon />
+                    </IconButton>
+                  </Box>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <Alert severity="info" sx={{ textAlign: "center" }}>
+              No posts yet
+            </Alert>
+          )}
+        </Box>
+      )}
+    </Container>
+  );
 };
 
 export default PostsPage;
