@@ -5,12 +5,15 @@ import Navigation from "./components/Navigation";
 import LoginPage from "./pages/LoginPage";
 import PostsPage from "./pages/PostsPage";
 import ProfilePage from "./pages/ProfilePage";
-import { AuthProvider } from './AuthContext'; // הוספת ייבוא של AuthProvider
+import Create from "./pages/Create";
+import Logout from "./pages/Logout";
+
+import { AuthProvider } from './AuthContext'; // עטיפת האפליקציה ב-AuthProvider
 import './index.css';
 
 function App() {
     return (
-        <AuthProvider> {/* עטיפת האפליקציה ב-AuthProvider */}
+        <AuthProvider>
             <Router>
                 <Navigation />
                 <Routes>
@@ -19,6 +22,8 @@ function App() {
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/posts" element={<PostsPage />} />
                     <Route path="/profile" element={<ProfilePage />} />
+                    <Route path="/logout" element={<Logout />} />
+                    <Route path="/create" element={<Create />} />
                 </Routes>
             </Router>
         </AuthProvider>
