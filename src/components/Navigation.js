@@ -1,11 +1,11 @@
 import React, { useContext } from 'react';
 import { Link } from 'react-router-dom';
-import { AppBar, Toolbar, Button, Box } from '@mui/material';
-import { Home, PersonAdd, Login, Article, Logout, Person } from '@mui/icons-material'; 
+import { AppBar, Toolbar, Button, Box, Typography } from '@mui/material';
+import { Home, PersonAdd, Login, Article, Logout, Person, Add } from '@mui/icons-material'; 
 import { AuthContext } from '../AuthContext';
 
 const Navigation = () => {
-  const { isAuthenticated, logout } = useContext(AuthContext);
+  const { isAuthenticated, logout, user } = useContext(AuthContext);
 
   return (
     <AppBar 
@@ -68,7 +68,23 @@ const Navigation = () => {
           >
             Posts
           </Button>
+          {isAuthenticated && (
+            <Button 
+              component={Link} 
+              to="/create" 
+              startIcon={<Add />} 
+              sx={navButtonStyle}
+            >
+              Create
+            </Button>
+          )}
         </Box>
+        {/* הוספת שם המשתמש בצד ימין עם בדיקה אם user קיים */}
+        {isAuthenticated && user && (
+          <Typography sx={{ color: '#f0f0f0', marginLeft: 'auto', fontWeight: 'bold' }}>
+            {user.username} {/* כאן אנחנו מניחים ש-user.username מכיל את שם המשתמש */}
+          </Typography>
+        )}
       </Toolbar>
     </AppBar>
   );

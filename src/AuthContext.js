@@ -5,7 +5,11 @@ export const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  const login = () => setIsAuthenticated(true);
+  const login = (username) => {
+    setIsAuthenticated(true);
+    localStorage.setItem('username', username); // שמור את שם המשתמש ב-localStorage
+  };
+
   const logout = () => {
     setIsAuthenticated(false);
     localStorage.removeItem('token');

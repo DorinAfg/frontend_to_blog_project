@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000/api';
+
+const API_URL = 'http://127.0.0.1:8000/api';
 
 export const fetchPosts = async () => {
     try {
@@ -14,3 +15,20 @@ export const fetchPosts = async () => {
     }
 };
 
+// פונקציה ליצירת פוסט חדש
+export const createPost = async (postData) => {
+    try {
+        const response = await axios.post(`${API_URL}/posts/`, postData, {
+            headers: {
+                'Content-Type': 'application/json',
+                // אם יש צורך ב-Token של המשתמש, הוסף כאן
+                // 'Authorization': `Bearer ${token}`
+            },
+        });
+        
+        return response.data;  // החזרת הפוסט שנוצר
+    } catch (error) {
+        console.error('Error creating post:', error);
+        throw new Error('Failed to create post');
+    }
+};
