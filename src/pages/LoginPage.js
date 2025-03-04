@@ -14,40 +14,36 @@ const LoginPage = () => {
     const [success, setSuccess] = useState(false);
     const [showPassword, setShowPassword] = useState(false); // סטייט חדש כדי לעקוב אחרי הצגת הסיסמה
 
-    const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
-    };
-
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError("");
         setSuccess(false);
-
+      
         try {
-            const response = await axios.post(`${API_URL}/auth/login/`, formData);
-            console.log("Login successful:", response.data);
-
-            // שמירה רק של שם המשתמש ב-localStorage
-            localStorage.setItem("username", formData.username);
-
-            // קריאה לפונקציית ה-login בהקשר של AuthContext
-            login(formData.username);
-
-            setSuccess(true);
+          const response = await axios.post(`${API_URL}/auth/login/`, formData);
+          console.log("Login successful:", response.data);
+      
+          // שמירה של ה-token ב-localStorage
+          localStorage.setItem("username", formData.username);
+          localStorage.setItem("token", response.data.token);  // שמירה של ה-token
+      
+          // קריאה לפונקציית ה-login בהקשר של AuthContext
+          login(formData.username);
+      
+          setSuccess(true);
         } catch (err) {
-            console.error("Login error:", err.response?.data || err.message);
-            if (err.response?.status === 401) {
-                // בדוק אם ההודעה היא על שם משתמש שלא קיים
-                if (err.response.data.detail === "user not exist") {
-                    setError("user not exist");
-                } else {
-                    setError("password incorrect");
-                }
+          console.error("Login error:", err.response?.data || err.message);
+          if (err.response?.status === 401) {
+            if (err.response.data.detail === "user not exist") {
+              setError("user not exist");
             } else {
-                setError("password incorrect");
+              setError("password incorrect");
             }
+          } else {
+            setError("password incorrect");
+          }
         }
-    };
+      };
 
     return (
         <Container maxWidth="xs">
@@ -62,7 +58,7 @@ const LoginPage = () => {
                         label="Username"
                         name="username"
                         value={formData.username}
-                        onChange={handleChange}
+                        onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                         fullWidth
                         margin="normal"
                         required
@@ -73,7 +69,7 @@ const LoginPage = () => {
                         name="password"
                         type={showPassword ? "text" : "password"} // שינוי סוג השדה לפי הסטייט
                         value={formData.password}
-                        onChange={handleChange}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                         fullWidth
                         margin="normal"
                         required
