@@ -12,7 +12,7 @@ const LoginPage = () => {
     const [formData, setFormData] = useState({ username: "", password: "" });
     const [error, setError] = useState("");
     const [success, setSuccess] = useState(false);
-    const [showPassword, setShowPassword] = useState(false); // סטייט חדש כדי לעקוב אחרי הצגת הסיסמה
+    const [showPassword, setShowPassword] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -20,30 +20,30 @@ const LoginPage = () => {
         setSuccess(false);
       
         try {
-          const response = await axios.post(`${API_URL}/auth/login/`, formData);
-          console.log("Login successful:", response.data);
-      
-          // שמירה של ה-token ב-localStorage
-          localStorage.setItem("username", formData.username);
-          localStorage.setItem("token", response.data.token);  // שמירה של ה-token
-      
-          // קריאה לפונקציית ה-login בהקשר של AuthContext
-          login(formData.username);
-      
-          setSuccess(true);
-        } catch (err) {
-          console.error("Login error:", err.response?.data || err.message);
-          if (err.response?.status === 401) {
-            if (err.response.data.detail === "user not exist") {
-              setError("user not exist");
-            } else {
-              setError("password incorrect");
+            const response = await axios.post(`${API_URL}/auth/login/`, formData);
+            console.log("Full login response:", response); 
+            console.log("Login response data:", response.data); 
+
+            const token = response.data.key;  // השרת מחזיר את הטוקן תחת `key`
+            if (!token) {
+                console.error("No token received from the server! Response data:", response.data);
+                setError("No token received. Please try again.");
+                return;
             }
-          } else {
-            setError("password incorrect");
-          }
+
+            localStorage.setItem("username", formData.username);
+            localStorage.setItem("token", token);
+            login(formData.username, token);
+            setSuccess(true);
+        } catch (err) {
+            console.error("Login error:", err.response?.data || err.message);
+            if (err.response?.status === 401) {
+                setError(err.response.data.detail === "user not exist" ? "user not exist" : "password incorrect");
+            } else {
+                setError("password incorrect");
+            }
         }
-      };
+    };
 
     return (
         <Container maxWidth="xs">
@@ -67,7 +67,7 @@ const LoginPage = () => {
                     <TextField
                         label="Password"
                         name="password"
-                        type={showPassword ? "text" : "password"} // שינוי סוג השדה לפי הסטייט
+                        type={showPassword ? "text" : "password"}
                         value={formData.password}
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                         fullWidth
@@ -76,43 +76,15 @@ const LoginPage = () => {
                         sx={{ mb: 2 }}
                         InputProps={{
                             endAdornment: (
-                                <IconButton
-                                    onClick={() => setShowPassword(!showPassword)} // הפיכת הסטייט כשנלחצים על הכפתור
-                                    edge="end"
-                                >
+                                <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
                                     {showPassword ? <VisibilityOff /> : <Visibility />} 
                                 </IconButton>
                             ),
                         }}
                     />
-                    {error && (
-                        <Alert severity="error" sx={{ mb: 2 }}>
-                            {error}
-                        </Alert>
-                    )}
-                    {success && (
-                        <Alert severity="success" sx={{ mb: 2 }}>
-                            Login successful!
-                        </Alert>
-                    )}
-                    <Button 
-                        type="submit" 
-                        variant="contained" 
-                        fullWidth
-                        sx={{ 
-                            mt: 1, 
-                            fontWeight: 600, 
-                            paddingY: 1.5, 
-                            textTransform: "none", 
-                            borderRadius: 2,
-                            backgroundColor: "#1e3a5f",
-                            boxShadow: "0px 4px 10px rgba(0,0,0,0.1)",
-                            "&:hover": { 
-                                backgroundColor: "#1e3a5f",
-                                boxShadow: "0px 6px 15px rgba(0,0,0,0.15)" 
-                            }
-                        }}
-                    >
+                    {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+                    {success && <Alert severity="success" sx={{ mb: 2 }}>Login successful!</Alert>}
+                    <Button type="submit" variant="contained" fullWidth sx={{ mt: 1, fontWeight: 600 }}>
                         Log in
                     </Button>
                 </form>
