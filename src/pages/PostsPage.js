@@ -1,33 +1,33 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { Container, Box, Typography, Card, CardMedia, CardContent, IconButton, CircularProgress, Alert } from "@mui/material";
-import ThumbUpIcon from '@mui/icons-material/ThumbUp';
+import FavoriteIcon from '@mui/icons-material/Favorite'; // שימוש ב-FavoriteIcon
 import DeleteIcon from '@mui/icons-material/Delete';
 
 const API_URL = "http://127.0.0.1:8000/api";
 
 const PostsPage = () => {
-  const [posts, setPosts] = useState([]); // שמירת הפוסטים
-  const [loading, setLoading] = useState(true); // מצב טעינה
-  const [error, setError] = useState(""); // מצב שגיאה
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [likedPosts, setLikedPosts] = useState(new Set()); // לשמור את הפוסטים שעליהם עשינו לייק
+  const [likeError, setLikeError] = useState(""); // הודעה במקרה של לייק כפול
 
   useEffect(() => {
     const fetchPosts = async () => {
       try {
-        // שליחת בקשה לקבלת הפוסטים
         const response = await axios.get(`${API_URL}/posts/`);
-        setPosts(response.data.results || response.data); // שמירה של הפוסטים במצב
-        setLoading(false); // עדכון מצב טעינה
+        setPosts(response.data.results || response.data);
+        setLoading(false);
       } catch (err) {
-        // אם יש שגיאה, הצגת השגיאה
         console.error("Error fetching posts:", err);
         setError(`Error fetching posts: ${err.response?.data?.detail || err.message}`);
-        setLoading(false); // עדכון מצב טעינה
+        setLoading(false);
       }
     };
 
-    fetchPosts(); // קריאה לפונקציה בתוך ה-useEffect
-  }, []); // קריאה אחת בלבד, כשמרכיבי הקומפוננטה נטענים
+    fetchPosts();
+  }, []);
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString(undefined, {
@@ -40,11 +40,20 @@ const PostsPage = () => {
   const handleDeletePost = async (postId) => {
     if (window.confirm("Are you sure you want to delete this post?")) {
       try {
+        const token = localStorage.getItem("token");
+        console.log("Token:", token);
+        if (!token) {
+          console.error("No token found");
+          setError("You must be logged in to delete posts.");
+          return;
+        }
+
         const response = await axios.delete(`${API_URL}/posts/${postId}/`, {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            Authorization: `Token ${token}`,
           },
         });
+
         if (response.status === 204) {
           setPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId));
           console.log("Post deleted successfully.");
@@ -53,30 +62,57 @@ const PostsPage = () => {
         }
       } catch (error) {
         console.error("Error deleting post:", error);
+        setError("Failed to delete the post.");
       }
     }
   };
 
   const handleLikePost = async (postId) => {
     try {
-      await axios.post(
-        "http://127.0.0.1:8000/api/likes/create/",
-        { post_id: postId }, // שולחים את ה-ID בגוף הבקשה
+      const token = localStorage.getItem("token");
+      console.log("Token:", token);
+      console.log("Post ID:", postId);
+
+      if (!token) {
+        console.error("No token found");
+        setError("You must be logged in to like posts.");
+        return;
+      }
+
+      // אם כבר עשינו לייק על הפוסט
+      if (likedPosts.has(postId)) {
+        setLikeError("You have already liked this post!");
+        return;
+      }
+
+      // אם הפוסט לא בלייקים, נוסיף את הלייק
+      const response = await axios.post(
+        `${API_URL}/likes/create/`,
+        {
+          post: postId,
+        },
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            Authorization: `Token ${token}`,
             "Content-Type": "application/json",
           },
         }
       );
 
+      console.log("Like response:", response);
+
+      // עדכון המצב: הוסף את הפוסט לרשימת הלייקים
+      setLikedPosts((prevLikedPosts) => new Set(prevLikedPosts).add(postId));
       setPosts((prevPosts) =>
         prevPosts.map((post) =>
-          post.id === postId ? { ...post, likes_count: post.likes_count + 1 } : post
+          post.id === postId ? { ...post, likes_count: (post.likes_count || 0) + 1 } : post
         )
       );
+      setLikeError(""); // מנקה את הודעת השגיאה במקרה של לייק מוצלח
     } catch (error) {
       console.error("Error liking post:", error);
+      setError("Failed to like the post.");
+      console.error("Error response:", error.response?.data);
     }
   };
 
@@ -90,6 +126,7 @@ const PostsPage = () => {
         <Alert severity="error">{error}</Alert>
       ) : (
         <Box sx={{ mt: 3 }}>
+          {likeError && <Alert severity="info">{likeError}</Alert>}
           {posts.length > 0 ? (
             posts.map((post) => (
               <Card
@@ -105,44 +142,42 @@ const PostsPage = () => {
                 {post.image && (
                   <CardMedia
                     component="img"
-                    height="200" // גובה קטן יותר לתמונה
+                    height="200"
                     image={post.image}
                     alt="Post Image"
                     sx={{ objectFit: "cover" }}
                   />
                 )}
                 <CardContent>
-                  {/* שם היוצר */}
                   <Typography variant="body2" sx={{ fontWeight: "bold", color: "#555" }}>
                     {post.author}
                   </Typography>
 
-                  {/* כותרת הפוסט */}
                   <Typography variant="h6" sx={{ fontWeight: "bold", color: "#333", mt: 1 }}>
                     {post.title}
                   </Typography>
 
-                  {/* תוכן הפוסט */}
                   <Typography variant="body2" sx={{ color: "#777", mt: 1 }}>
                     {post.content}
                   </Typography>
 
-                  {/* תאריך יצירת הפוסט */}
                   <Typography variant="body2" sx={{ color: "#888", fontStyle: "italic", mt: 1 }}>
                     Created on: {formatDate(post.created_at)}
                   </Typography>
 
-                  {/* כפתור לייק ומחיקה */}
                   <Box sx={{ display: "flex", alignItems: "center", mt: 2 }}>
-                    <IconButton onClick={() => handleLikePost(post.id)} color="primary">
-                      <ThumbUpIcon />
+                    {/* הלייק (לב אדום) */}
+                    <IconButton onClick={() => handleLikePost(post.id)} color="error">
+                      <FavoriteIcon />
                     </IconButton>
-                    <Typography variant="body2" sx={{ color: "#777", ml: 1 }}>
+
+                    {/* מספר הלייקים */}
+                    <Typography variant="body2" sx={{ color: "#777", mr: 1 }}>
                       {post.likes_count || 0}
                     </Typography>
 
-                    {/* כפתור פח זבל */}
-                    <IconButton onClick={() => handleDeletePost(post.id)} color="error">
+                    {/* כפתור מחיקה (הפח) בצד ימין */}
+                    <IconButton onClick={() => handleDeletePost(post.id)} color="error" sx={{ ml: "auto" }}>
                       <DeleteIcon />
                     </IconButton>
                   </Box>

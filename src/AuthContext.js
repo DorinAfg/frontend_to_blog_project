@@ -3,15 +3,14 @@ import React, { createContext, useState } from 'react';
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  // אתחול מצב האימות מהנתונים ב-localStorage אם יש
   const [isAuthenticated, setIsAuthenticated] = useState(
-    localStorage.getItem('token') && localStorage.getItem('username') ? true : false
+    !!localStorage.getItem('token') && !!localStorage.getItem('username')
   );
 
   const login = (username, token) => {
     setIsAuthenticated(true);
-    localStorage.setItem('username', username); // שמור את שם המשתמש ב-localStorage
-    localStorage.setItem('token', token); // שמור את ה-token ב-localStorage
+    localStorage.setItem('username', username);
+    localStorage.setItem('token', token);  // עכשיו שומר את הטוקן כמו שצריך
   };
 
   const logout = () => {

@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { Container, Box, Typography, Card, CardContent, CardMedia, IconButton, CircularProgress, Alert } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
-import ThumbUpIcon from '@mui/icons-material/ThumbUp';
+import FavoriteIcon from '@mui/icons-material/Favorite';
 import axios from 'axios';
 
-const API_URL = "http://127.0.0.1:8000/api"; 
+const API_URL = "http://127.0.0.1:8000/api";
 
 const ProfilePage = () => {
   const [username, setUsername] = useState('');
   const [posts, setPosts] = useState([]);
-  const [loading, setLoading] = useState(true); // מצב טעינה
+  const [loading, setLoading] = useState(true);
+  const [likedPosts, setLikedPosts] = useState(new Set()); // לשמור את הפוסטים שעליהם עשינו לייק
 
   useEffect(() => {
     const storedUsername = localStorage.getItem('username');
@@ -26,15 +27,15 @@ const ProfilePage = () => {
       try {
         const response = await axios.get(`${API_URL}/posts/`, {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            Authorization: `Token ${localStorage.getItem('token')}`,
           },
         });
         const userPosts = response.data.results.filter(post => post.author === username);
         setPosts(userPosts);
-        setLoading(false); // עדכון מצב טעינה אחרי שהפוסטים נטענו
+        setLoading(false);
       } catch (error) {
         console.error("Error fetching posts:", error);
-        setLoading(false); // עדכון מצב טעינה אם הייתה שגיאה
+        setLoading(false);
       }
     };
 
@@ -54,7 +55,7 @@ const ProfilePage = () => {
       try {
         const response = await axios.delete(`${API_URL}/posts/${postId}/`, {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            Authorization: `Token ${localStorage.getItem('token')}`,
           },
         });
         if (response.status === 204) {
@@ -70,24 +71,44 @@ const ProfilePage = () => {
   };
 
   const handleLikePost = async (postId) => {
-    try {
-        await axios.post("http://127.0.0.1:8000/api/likes/create/", 
-            { post_id: postId }, // שולחים את ה-ID בגוף הבקשה
-            {
-                headers: {
-                    Authorization: `Bearer ${localStorage.getItem('token')}`,
-                    "Content-Type": "application/json",
-                },
-            }
-        );
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.error("No token found");
+      alert("You must be logged in to like posts.");
+      return;
+    }
 
-        setPosts((prevPosts) =>
-            prevPosts.map((post) =>
-                post.id === postId ? { ...post, likes_count: post.likes_count + 1 } : post
-            )
-        );
+    // אם כבר עשינו לייק על הפוסט
+    if (likedPosts.has(postId)) {
+      alert("You have already liked this post!");
+      return;
+    }
+
+    try {
+      // שליחה של בקשה ללייק
+      const response = await axios.post(
+        `${API_URL}/likes/create/`,
+        { post: postId },
+        {
+          headers: {
+            Authorization: `Token ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      console.log("Like response:", response);
+
+      // עדכון המצב: הוסף את הפוסט לרשימת הלייקים
+      setLikedPosts((prevLikedPosts) => new Set(prevLikedPosts).add(postId));
+      setPosts((prevPosts) =>
+        prevPosts.map((post) =>
+          post.id === postId ? { ...post, likes_count: (post.likes_count || 0) + 1 } : post
+        )
+      );
     } catch (error) {
-        console.error('Error liking post:', error);
+      console.error("Error liking post:", error);
+      alert("Failed to like the post.");
     }
   };
 
@@ -105,42 +126,39 @@ const ProfilePage = () => {
                 {post.image && (
                   <CardMedia
                     component="img"
-                    height="200" // גובה קטן יותר לתמונה
+                    height="200"
                     image={post.image}
                     alt="Post Image"
                     sx={{ objectFit: "cover" }}
                   />
                 )}
                 <CardContent>
-                  {/* שם היוצר */}
                   <Typography variant="body2" sx={{ fontWeight: "bold", color: "#555" }}>
                     {post.author}
                   </Typography>
 
-                  {/* כותרת הפוסט */}
                   <Typography variant="h6" sx={{ fontWeight: "bold", color: "#333", mt: 1 }}>
                     {post.title}
                   </Typography>
-                  
-                  {/* תוכן הפוסט */}
+
                   <Typography variant="body2" sx={{ color: "#777", mt: 1 }}>
                     {post.content}
                   </Typography>
 
-                  {/* תאריך יצירת הפוסט */}
                   <Typography variant="body2" sx={{ color: "#888", fontStyle: "italic", mt: 1 }}>
                     Created on: {formatDate(post.created_at)}
                   </Typography>
 
-                  {/* כפתור לייק */}
-                  <Box sx={{ display: "flex", alignItems: "center", mt: 2 }}>
-                    <IconButton onClick={() => handleLikePost(post.id)} color="primary">
-                      <ThumbUpIcon />
-                    </IconButton>
-                    <Typography variant="body2" sx={{ color: "#777", ml: 1 }}>
-                      {post.likes_count || 0}
-                    </Typography>
-                    {/* כפתור מחיקה */}
+                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mt: 2 }}>
+                    <Box sx={{ display: "flex", alignItems: "center" }}>
+                      <IconButton onClick={() => handleLikePost(post.id)} color="error">
+                        <FavoriteIcon />
+                      </IconButton>
+                      <Typography variant="body2" sx={{ color: "#777", ml: 1 }}>
+                        {post.likes_count || 0}
+                      </Typography>
+                    </Box>
+
                     <IconButton onClick={() => handleDeletePost(post.id)} color="error">
                       <DeleteIcon />
                     </IconButton>
