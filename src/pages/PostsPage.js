@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { Container, Box, Typography, Card, CardMedia, CardContent, IconButton, CircularProgress, Alert, TextField, Button } from "@mui/material";
+import { Container, Box, Typography, Card, CardMedia, CardContent, IconButton, CircularProgress, Alert, TextField, Button, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
 import FavoriteIcon from '@mui/icons-material/Favorite'; 
 import DeleteIcon from '@mui/icons-material/Delete';
-import ChatBubbleIcon from '@mui/icons-material/ChatBubble'; 
 
 const API_URL = "http://127.0.0.1:8000/api";
 
@@ -13,10 +12,13 @@ const PostsPage = () => {
   const [error, setError] = useState("");
   const [likedPosts, setLikedPosts] = useState(new Set());
   const [likeError, setLikeError] = useState("");
-  const [comments, setComments] = useState([]); // אתחול כ-array
+  const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState(""); 
   const [currentPage, setCurrentPage] = useState(1); 
   const [totalPages, setTotalPages] = useState(1); 
+  const [openLikesDialog, setOpenLikesDialog] = useState(false); 
+  const [likedUsers, setLikedUsers] = useState([]); 
+  const [visibleComments, setVisibleComments] = useState(3);
 
   const fetchPosts = async (page) => {
     try {
@@ -46,7 +48,6 @@ const PostsPage = () => {
   const fetchComments = async () => {
     try {
       const response = await axios.get(`${API_URL}/comments/`);
-      // שמירת התגובות בצורה נכונה
       const formattedComments = response.data.results || [];
       setComments(formattedComments);
     } catch (err) {
@@ -59,6 +60,33 @@ const PostsPage = () => {
     fetchComments(); 
   }, []); 
 
+  const fetchLikedUsers = async (postId) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        console.error("No token found");
+        return;
+      }
+
+      const response = await axios.get(`${API_URL}/likes/?post=${postId}`, {
+        headers: {
+          Authorization: `Token ${token}`,
+        },
+      });
+
+      console.log("Fetched liked users:", response.data);  
+
+      if (response.data && response.data.results) {
+        const likedUsers = response.data.results.map(like => like.user);
+        setLikedUsers(likedUsers);
+      }
+
+      setOpenLikesDialog(true); 
+    } catch (error) {
+      console.error("Error fetching liked users:", error);
+    }
+  };
+
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString(undefined, {
       year: "numeric",
@@ -67,7 +95,13 @@ const PostsPage = () => {
     });
   };
 
-  const handleDeletePost = async (postId) => {
+  const handleDeletePost = async (postId, postAuthor) => {
+    const username = localStorage.getItem("username"); 
+    if (username !== postAuthor) {
+      setError("You can only delete posts that you have authored.");
+      return;
+    }
+
     if (window.confirm("Are you sure you want to delete this post?")) {
       try {
         const token = localStorage.getItem("token");
@@ -123,13 +157,48 @@ const PostsPage = () => {
     }
   };
 
+  const handleLikeComment = async (commentId) => {
+    try {
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        console.error("User is not authenticated.");
+        return;
+      }
+
+      const data = { comment: commentId };
+
+      const response = await axios.post(
+        `${API_URL}/likes/create/`,
+        data,
+        {
+          headers: {
+            Authorization: `Token ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      console.log("API Response:", response.data);
+
+      setComments((prevComments) =>
+        prevComments.map((comment) =>
+          comment.id === commentId
+            ? { ...comment, likes_count: (comment.likes_count || 0) + 1 }
+            : comment
+        )
+      );
+    } catch (error) {
+      console.error("Error liking the comment:", error);
+    }
+  };
+
   const handleCommentClick = (postId) => {
-    // מקשר את התגובות לפוסט לפי ה-ID
     return comments.filter((comment) => comment.post === postId);
   };
 
   const handleAddComment = async (postId) => {
-    if (!newComment) return;
+    if (!newComment.trim()) return;
 
     try {
       const token = localStorage.getItem("token");
@@ -147,7 +216,7 @@ const PostsPage = () => {
       setComments((prevComments) => [...prevComments, response.data]);
       setNewComment("");
     } catch (error) {
-      console.error("Error adding comment:", error);
+      console.error("Error adding comment:", error.response);
       setError("Failed to add comment.");
     }
   };
@@ -202,33 +271,49 @@ const PostsPage = () => {
                   </Typography>
 
                   <Box sx={{ display: "flex", alignItems: "center", mt: 2 }}>
-                    <IconButton onClick={() => handleLikePost(post.id)} color="error">
-                      <FavoriteIcon />
-                    </IconButton>
-
                     <Typography variant="body2" sx={{ color: "#777", mr: 1 }}>
                       {post.likes_count || 0}
                     </Typography>
 
-                    <IconButton onClick={() => handleCommentClick(post.id)} color="default">
-                      <ChatBubbleIcon />
+                    <IconButton
+                      onClick={() => handleLikePost(post.id)}
+                      color={likedPosts.has(post.id) ? "error" : "default"}
+                    >
+                      <FavoriteIcon />
                     </IconButton>
 
-                    <IconButton onClick={() => handleDeletePost(post.id)} color="error" sx={{ ml: "auto" }}>
+                    <IconButton onClick={() => handleDeletePost(post.id, post.author)} color="error" sx={{ ml: "auto" }}>
                       <DeleteIcon />
                     </IconButton>
+
+                    <Button onClick={() => fetchLikedUsers(post.id)}>View Likes</Button>
                   </Box>
 
                   <Box sx={{ mt: 2 }}>
                     <Typography variant="h6" sx={{ fontWeight: "bold" }}>Comments:</Typography>
-                    {handleCommentClick(post.id).length === 0 ? (
-                      <Typography variant="body2" sx={{ color: "#777" }}>No comments yet.</Typography>
-                    ) : (
-                      handleCommentClick(post.id).map((comment) => (
-                        <Typography key={comment.id} variant="body2" sx={{ color: "#555", mt: 1 }}>
+                    {handleCommentClick(post.id).slice(0, visibleComments).map((comment) => (
+                      <Box key={comment.id} sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                        <Typography variant="body2" sx={{ color: "#777", mr: 1 }}>
+                          {comment.likes_count || 0}
+                        </Typography>
+
+                        <IconButton
+                          onClick={() => handleLikeComment(comment.id)}
+                          sx={{ color: "pink", fontSize: 20, mr: 1 }}
+                        >
+                          <FavoriteIcon />
+                        </IconButton>
+
+                        <Typography variant="body2" sx={{ color: "#555", flex: 1 }}>
                           {comment.author}: {comment.content}
                         </Typography>
-                      ))
+                      </Box>
+                    ))}
+                    
+                    {handleCommentClick(post.id).length > visibleComments && (
+                      <Button onClick={() => setVisibleComments(visibleComments + 3)} sx={{ mt: 2 }}>
+                        See more
+                      </Button>
                     )}
 
                     <TextField
@@ -256,7 +341,6 @@ const PostsPage = () => {
               No posts yet
             </Alert>
           )}
-          {/* Pagination controls */}
           <Box sx={{ display: "flex", justifyContent: "space-between", mt: 3 }}>
             <Button
               variant="contained"
@@ -275,6 +359,26 @@ const PostsPage = () => {
           </Box>
         </Box>
       )}
+      
+      <Dialog open={openLikesDialog} onClose={() => setOpenLikesDialog(false)}>
+        <DialogTitle>Liked Users</DialogTitle>
+        <DialogContent>
+          {likedUsers.length > 0 ? (
+            likedUsers.map((username, index) => (
+              <Typography key={index} variant="body2">
+                {username}
+              </Typography>
+            ))
+          ) : (
+            <Typography variant="body2">No likes yet</Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenLikesDialog(false)} color="primary">
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };
